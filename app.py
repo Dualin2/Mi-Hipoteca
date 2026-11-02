@@ -19,10 +19,10 @@ def calcular_cuota(capital, interes_anual, meses):
 
 st.sidebar.header("Datos de tu Hipoteca")
 capital_inicial = st.sidebar.number_input("Capital Inicial (€)", min_value=0.0, value=150000.0, step=1000.0)
-capital_pendiente = st.sidebar.number_input("Capital Pendiente actual (€)", min_value=0.0, value=88946.62, step=1000.0)
+capital_pendiente = st.sidebar.number_input("Capital Pendiente actual (€)", min_value=0.0, value=87367.20, step=1000.0)
 fecha_inicio = st.sidebar.date_input("Fecha de inicio", date(2009, 7, 28))
 fecha_fin_teorica = st.sidebar.date_input("Fecha fin teórica", date(2044, 7, 28))
-intereses_historicos = st.sidebar.number_input("Intereses históricos pagados (€)", value=39162.26, step=100.0)
+intereses_historicos = st.sidebar.number_input("Intereses históricos pagados (€)", value=39725.26, step=100.0)
 
 capital_amortizado = capital_inicial - capital_pendiente
 hoy = date.today()
@@ -57,7 +57,7 @@ st.sidebar.subheader("Desgravación Fiscal")
 desgrava = st.sidebar.checkbox("¿Desgravas por vivienda habitual?", value=True)
 pagado_este_año = 0.0
 if desgrava:
-    pagado_este_año = st.sidebar.number_input("Pagado este año hasta hoy (€)", min_value=0.0, value=4482.07, step=100.0)
+    pagado_este_año = st.sidebar.number_input("Pagado este año hasta hoy (€)", min_value=0.0, value=6331.97, step=100.0)
 
 interes_anual = euribor + diferencial
 interes_anual_proximo = euribor_proximo + diferencial
@@ -97,7 +97,7 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
         
     intereses_totales_sin_amortizar = int_base_total
     
-    st.header("Resumen Actual (Sin amortizar extra)")
+    st.header("1️⃣ Situación de Partida (Sin amortizaciones extras)")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Cuota Actual", f"{cuota_actual_banco:.2f} €", f"Hasta {mes_revision_str}", delta_color="off")
     
@@ -122,7 +122,13 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
     
     # --- 2. SIMULACIÓN CON APORTACIÓN EXTRA ---
     if aportacion_extra > 0 or aportacion_unica > 0:
-        cap_sim = capital_pendiente - aportacion_unica
+        cap_sim = max(0.0, capital_pendiente - aportacion_unica)
+        
+        # Cuota inmediata recalculada por el banco tras la aportación puntual
+        cuota_banco_inmediata = calcular_cuota(cap_sim, interes_anual, meses_restantes)
+        bajada_cuota = cuota_banco_inmediata - cuota_actual_banco
+        cuota_banco_en_revision = cuota_banco_inmediata
+        
         int_sim_total = 0
         meses_simulados = 0
         
@@ -140,6 +146,9 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
             i_mes = cap_sim * tasa
             int_sim_total += i_mes
             
+            if meses_simulados == meses_hasta_revision + 1:
+                cuota_banco_en_revision = calcular_cuota(cap_sim, int_anual_sim, meses_restantes - (meses_simulados - 1))
+            
             if tipo_amortizacion == "Lo reinvierto (Bola de Nieve ⛄)":
                 pago_total = cuota_natural + aportacion_extra
             else:
@@ -156,13 +165,67 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
         nueva_fecha_fin = restar_meses(fecha_fin_teorica, meses_ahorrados)
         int_ahorrados_fmt = f"{intereses_ahorrados:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         
+        st.header("2️⃣ Simulación con tus Aportaciones")
+        if aportacion_unica > 0:
+            st.success(f"✅ **Aportación puntual de {aportacion_unica:,.2f} € aplicada:** Tu banco recalcula la hipoteca y tu cuota mensual baja de **{cuota_actual_banco:.2f} €** a **{cuota_banco_inmediata:.2f} €** ({bajada_cuota:+.2f} €/mes).")
+        
         texto_puntual = f" + {aportacion_unica:,.0f} € puntual".replace(',', '.') if aportacion_unica > 0 else ""
         if tipo_amortizacion == "Lo reinvierto (Bola de Nieve ⛄)":
-            st.header(f"🚀 Efecto Bola de Nieve (Aportando {aportacion_extra} €/mes{texto_puntual}):")
+            st.subheader(f"🚀 Efecto Bola de Nieve (Aportando {aportacion_extra} €/mes{texto_puntual}):")
             st.info("💡 Estás aplicando el **Método Bola de Nieve**: como el banco te va pidiendo menos cuota base cada mes, tú coges esa pequeña diferencia de ahorro y la reinviertes en la hipoteca. Tu esfuerzo de bolsillo nunca cambia, pero el capital que devoras crece espectacularmente.")
         else:
-            st.header(f"🚶‍♂️ Amortización Normal (Aportando {aportacion_extra} €/mes{texto_puntual}):")
+            st.subheader(f"🚶‍♂️ Amortización Normal (Aportando {aportacion_extra} €/mes{texto_puntual}):")
             st.info("💡 Estás aplicando la **Amortización Normal**: pagas al banco su cuota real (que irá bajando poco a poco) + tu extra limpio. El dinero que te ahorras en la cuota te lo guardas en tu bolsillo.")
+            
+        # --- BLOQUE VISIBLE DE LA NUEVA CUOTA ---
+        st.write("#### 💳 ¿Cómo queda tu Cuota del Banco?")
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        
+        diff_color = "inverse" if bajada_cuota <= 0 else "normal"
+        col_c1.metric(
+            "Nueva Cuota Inmediata",
+            f"{cuota_banco_inmediata:.2f} €",
+            f"{bajada_cuota:+.2f} €/mes",
+            delta_color=diff_color,
+            help=f"El banco te cobrará {cuota_banco_inmediata:.2f} € en el próximo recibo en vez de {cuota_actual_banco:.2f} €."
+        )
+        
+        diff_rev = cuota_banco_en_revision - cuota_tras_revision_banco
+        diff_rev_color = "inverse" if diff_rev <= 0 else "normal"
+        col_c2.metric(
+            "Nueva Cuota tras Revisión",
+            f"{cuota_banco_en_revision:.2f} €",
+            f"{diff_rev:+.2f} € vs sin amortizar",
+            delta_color=diff_rev_color,
+            help="Cuota que te cobrará el banco a partir de tu próxima revisión tras esta amortización."
+        )
+        
+        ahorro_anual_recibos = abs(bajada_cuota) * 12
+        col_c3.metric(
+            "Ahorro Anual en Recibos",
+            f"{ahorro_anual_recibos:,.2f} €/año".replace(',', 'X').replace('.', ',').replace('X', '.'),
+            f"{abs(bajada_cuota):.2f} € menos al mes",
+            help="Dinero que dejas de pagar al banco cada año solo por la rebaja de la cuota."
+        )
+        
+        if tipo_amortizacion == "Lo reinvierto (Bola de Nieve ⛄)":
+            extra_efectivo = aportacion_extra + abs(bajada_cuota)
+            pago_total_mes = cuota_actual_banco + aportacion_extra
+            col_c4.metric(
+                "Tu Pago Total Mensual",
+                f"{pago_total_mes:.2f} €",
+                f"{extra_efectivo:.2f} € amortización",
+                help=f"Cuota banco ({cuota_banco_inmediata:.2f} €) + Aportación extra bola de nieve ({extra_efectivo:.2f} €)."
+            )
+        else:
+            pago_total_mes = cuota_banco_inmediata + aportacion_extra
+            col_c4.metric(
+                "Tu Pago Total Mensual",
+                f"{pago_total_mes:.2f} €",
+                f"{bajada_cuota:+.2f} €",
+                delta_color="inverse",
+                help=f"Cuota banco ({cuota_banco_inmediata:.2f} €) + Tu extra mensual ({aportacion_extra:.2f} €)."
+            )
             
         # --- CÁLCULO DE RENTABILIDAD (TIR) ---
         flujos = [0.0] * (meses_restantes + 1)
@@ -185,7 +248,8 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
             if npv > 0: low_r = mid_r
             else: high_r = mid_r
         tir_anual = ((1 + low_r)**12 - 1) * 100
-            
+        
+        st.write("#### ⏱️ Impacto en Tiempo, Intereses y Rentabilidad")
         col_a, col_b, col_c, col_d, col_e = st.columns(5)
         col_a.metric("Nuevo Plazo Restante", f"{meses_simulados} meses", f"-{meses_ahorrados} meses")
         col_b.metric("Nueva Fecha Fin", nueva_fecha_fin.strftime("%d/%m/%Y"))
@@ -199,9 +263,9 @@ if interes_anual > 0 and meses_restantes > 0 and capital_pendiente > 0:
             tot_proy = pagado_este_año + aportacion_unica
             for m in range(1, m_restantes_año + 1):
                 if m > meses_hasta_revision:
-                    c_n = cuota_tras_revision_banco
+                    c_n = cuota_banco_en_revision if tipo_amortizacion != "Lo reinvierto (Bola de Nieve ⛄)" else cuota_tras_revision_banco
                 else:
-                    c_n = cuota_actual_banco
+                    c_n = cuota_banco_inmediata if tipo_amortizacion != "Lo reinvierto (Bola de Nieve ⛄)" else cuota_actual_banco
                 tot_proy += (c_n + aportacion_extra)
                     
             tot_proy_fmt = f"{tot_proy:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
