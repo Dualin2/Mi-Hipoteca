@@ -19,7 +19,7 @@ def calcular_cuota(capital, interes_anual, meses):
 
 st.sidebar.header("Datos de tu Hipoteca")
 capital_inicial = st.sidebar.number_input("Capital Inicial (€)", min_value=0.0, value=150000.0, step=1000.0)
-capital_pendiente = st.sidebar.number_input("Capital Pendiente actual (€)", min_value=0.0, value=87367.20, step=1000.0)
+capital_pendiente = st.sidebar.number_input("Capital Pendiente actual (€)", min_value=0.0, value=87667.20, step=1000.0)
 fecha_inicio = st.sidebar.date_input("Fecha de inicio", date(2009, 7, 28))
 fecha_fin_teorica = st.sidebar.date_input("Fecha fin teórica", date(2044, 7, 28))
 intereses_historicos = st.sidebar.number_input("Intereses históricos pagados (€)", value=39725.26, step=100.0)
